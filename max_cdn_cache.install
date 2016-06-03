@@ -1,0 +1,24 @@
+<?php
+
+/**
+ * @file
+ * Schema for max_cdn_setting.
+ */
+
+/**
+ * Implements hook_install().
+ */
+function max_cdn_cache_install() {
+  $t = get_t();
+  drupal_set_message($t('MaxCDN Module has been installed successfully.Configure MaxCDN on this page <a href="@url">Settings</a>', array('@url'=>'admin/config/development/performance/maxcdn')));
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function max_cdn_cache_uninstall() {
+  // Remove variables.
+  db_delete('variable')
+    ->condition('name', 'maxcdn_%', 'LIKE')
+    ->execute();
+}

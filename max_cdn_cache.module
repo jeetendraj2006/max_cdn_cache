@@ -1,0 +1,112 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function max_cdn_cache_menu()
+{
+    $items['admin/config/development/performance/maxcdn'] = array(
+    'title' => 'MaxCDN Cache Settings',
+    'description' => 'Configuration for MaxCDN cache.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('maxcdn_admin_settings_form'),
+    'type' => MENU_LOCAL_TASK,
+    'access arguments' => array('administer site configuration'),
+    'weight' => 1,
+  );
+    return $items;
+}
+
+/**
+ * Implements form.
+ */
+
+function maxcdn_admin_settings_form($form, $form_state)
+{
+    drupal_set_title(t('MaxCDN: Configuration'));
+    $form['maxcdn_alias'] = array(
+        '#type' => 'textfield',
+        '#size' => 170,
+        '#maxlength' => 255,
+        '#default_value' => variable_get('maxcdn_alias'),   //get the value of alias
+        '#required' => true,
+        '#title' => t('Alias'),
+      );
+    $form['maxcdn_consumer_key'] = array(
+        '#type' => 'textfield',
+        '#size' => 170,
+        '#maxlength' => 255,
+        '#default_value' => variable_get('maxcdn_consumer_key'),    //get the value of consumer key
+        '#required' => true,
+        '#title' => t('Consumer Key'),
+      );
+    $form['maxcdn_consumer_secret'] = array(
+        '#type' => 'textfield',
+        '#size' => 170,
+        '#maxlength' => 255,
+        '#default_value' => variable_get('maxcdn_consumer_secret'), //get the value of consumer secret
+        '#required' => true,
+        '#title' => t('Consumer Secret'),
+      );
+    return system_settings_form($form);
+}
+
+/**
+ * Implements hook_flush_caches().
+ */
+
+function max_cdn_cache_flush_caches() {
+    //include MaxCDN library
+    $loader = require_once("include/vendor/autoload.php");
+    //get the value of alias
+    $alias = variable_get('maxcdn_alias'); 
+    //get the value of consumer key
+    $consumer_key = variable_get('maxcdn_consumer_key');
+    //get the value of consumer secret
+    $consumer_secret = variable_get('maxcdn_consumer_secret');
+    //check if all required value is exist or not
+    if(!empty($alias) && !empty($consumer_key) && !empty($consumer_secret)){
+        $api = new MaxCDN($alias,$consumer_key,$consumer_secret);
+        
+        $zoneid_api_call = $api->get('/zones/pull.json?nopaginate=1');
+        $json_o = json_decode($zoneid_api_call);
+        //array of zoneids from account
+        $array_zoneids = array();
+        if(array_key_exists("code",$json_o))
+        {
+
+            if($json_o->code == 200 || $json_o->code == 201)
+            {
+
+                        foreach ($json_o->data->pullzones as $o) {
+                                array_push($array_zoneids, $o->id);
+                        }
+
+                        //purge each cache of each zoneid
+                        foreach ($array_zoneids as $zoneid) {
+
+                                $purge_api_call = $api->delete("/zones/pull.json/$zoneid/cache");
+                                $purge_json = json_decode($purge_api_call);
+
+                                if(array_key_exists("code",$purge_json)) {
+                                        if($purge_json->code == 200 || $purge_json->code == 201) {
+                                                drupal_set_message("Zone ID [$zoneid] Cache cleared"); 
+
+                                            } 
+                                        }
+                            }
+            } 
+            else{
+                $error = "MaxCDN Error: " . $json_o->code; 
+                $elements = $json_o->error; 
+                foreach($elements as $key => $value) 
+                    { 
+                        $error .= ": $key = $value"; 
+                    }
+                //Display error if you have entered wrong MaxCDN's credentials
+                drupal_set_message($error);
+            }
+            
+        }
+    }
+}

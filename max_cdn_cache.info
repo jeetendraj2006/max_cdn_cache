@@ -1,0 +1,7 @@
+<?php
+;$Id
+name = Max CDN Cache 
+description = Clear cache of MaxCND via API when we clear cache of drupal
+package = Max CDN
+core = 7.x
+version = "7.x-1.1"
